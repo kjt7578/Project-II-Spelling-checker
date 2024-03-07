@@ -1,0 +1,9 @@
+Hello, my name is JT.
+I am a student at Rutgers University.
+My major is computer science.
+Hello,
+my
+name
+is
+Kelvin.
+line 9 was empty.
