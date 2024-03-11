@@ -17,18 +17,9 @@
 
 char *words[MAX_WORDS];
 int word_count = 0;
+int wrong_count = 0;
 
-
-void use_line(void *arg, char *line) {
-  if (word_count < MAX_WORDS) {
-    words[word_count++] = strdup(line);
-    if (DEBUG) printf("Stored: %s\n", line);
-  } else {
-    printf("Reached maximum word count. Cannot store more words.\n");
-  }
-}
-
-void read_lines(int fd, void(*use_line)(void *, char *), void *arg){
+void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char *dict){
         //  filename  , variable for print_line        ,  n: line count
   int buflength = BUFLENGTH;
   char *buf = malloc(BUFLENGTH);
@@ -42,15 +33,20 @@ void read_lines(int fd, void(*use_line)(void *, char *), void *arg){
     line_start = 0;
     int bufend = pos + bytes;
 
-    printf("Written bytes: %d\n", bytes);
+    if (DEBUG) printf("Written bytes: %d\n", bytes);
+    
     while(pos < bufend){  // when line changed while buffer is not full
       if(DEBUG) printf("start %d, pos %d, char '%c'\n",line_start, pos, buf[pos]);
-      if(buf[pos] == '\n' || buf[pos] == ' ' ){    // when found line change or space
-        if ( buf[pos] == '\n')                     // replace to \0 (NULL)
-          buf[pos] = '\0';      
-        else if ( buf[pos] == ' ')
+      
+      if(buf[pos] == '\n' || buf[pos] == ' ' || buf[pos] == ',' || buf[pos] == '"' || buf[pos] == '(' || buf[pos] ==  ')'|| buf[pos] == '[' || buf[pos] == ']' || buf[pos] ==  '{' || buf[pos] == '}' || buf[pos] == '.' || buf[pos] == '?' || buf[pos] == ':' || buf[pos] == ';' || buf[pos] == '/' || buf[pos] == '@' || buf[pos] == '*' || buf[pos] == '#' || buf[pos] == '$' || buf[pos] == '%' || buf[pos] == '^' || buf[pos] == '&' || buf[pos] == '.' || buf[pos] == '.' || buf[pos] == '.' || buf[pos] == '_' || buf[pos] == '='){    // when found line change, space, punctuation
           buf[pos] = '\0';
-        use_line(arg, buf + line_start);           // print that line
+
+        for(int i = pos; buf[i + 1] == ' '; i++) {
+            buf[i + 1] = '\0'; // 다음 공백을 널 문자로 대체
+        }
+
+        
+        use_line(arg, buf + line_start, dict);           // print that line
         line_start = pos + 1;                      // set linestart as the beginning of the line
       }
       pos++;
@@ -77,7 +73,7 @@ void read_lines(int fd, void(*use_line)(void *, char *), void *arg){
       buf = realloc(buf, buflength + 1);
     }
     buf[pos] = '\0';
-    use_line(arg, buf + line_start);
+    use_line(arg, buf + line_start, dict);
   }
   free(buf);
 }
@@ -117,10 +113,39 @@ int compare_each_word(const char *word, const char *dictionary_file) {
 }
 // ***************** COMPARE FUNCTION ENDS *********
 
+void use_line(void *arg, char *line) {
+    if (word_count < MAX_WORDS) {
+        words[word_count++] = strdup(line);
+        if (DEBUG) printf("Stored: %s\n", line);
+    } else {
+        printf("Reached maximum word count. Cannot store more words.\n");
+    }
+}
+
 //*****************************************************************
-void print_line(void *st, char *line){
+void print_line(void *st, char *line, char *dict){
   int *p = st;  //set pointer pointing n (line count)
-  printf("%d: %s\n", *p, line);
+
+//DEBUG
+  //char *dict = "words";
+  // if we specified any dict file, open that file (argv[1]), if not, words
+  int fd_dict = open(dict, O_RDONLY);
+  if(fd_dict < 0){
+    perror(dict);
+    exit(EXIT_FAILURE);
+  }
+  
+  //const char* dictionary_file = "words";
+  if (compare_each_word(line, dict) == 1) {
+      printf("The word '%s' is Correct.\n", line);
+  } else {
+      printf("The word '%s' is not in the dictionary.\n", line);
+    wrong_count++;
+  }
+
+  
+  
+  if (DEBUG) printf("%d: %s\n", *p, line);
   (*p)++;  //pointing next line
 }
 
@@ -141,48 +166,13 @@ int main(int argc, char **argv){
     perror(fname);
     exit(EXIT_FAILURE);
   }
-/*
-  off_t fileSize = lseek(fd, 0, SEEK_END);
-  if (fileSize == -1) {
-    perror("Error seeking file");
-    exit(EXIT_FAILURE);
-  }
 
-  if (lseek(fd, 0, SEEK_SET) == -1) {
-    perror("Error resetting file pointer to the start");
-    exit(EXIT_FAILURE);
-  }
-  
-  char *buffer = (char *)malloc(fileSize);
-  if (!buffer) {
-    perror("Memory allocation failed");
-    exit(EXIT_FAILURE);
-  }
-
-  char word[*buffer];
-  int n = 0; //line counts
-  read_lines(fd,print_line,&n);
-*/
-  // 
-  const char *word = "example"; // Declare a const char pointer to the word to be checked
-      const char *dictionary_file = "dictionary.txt"; // Declare a const char pointer to the dictionary file
-
-      if (compare_each_word(word, dictionary_file) == 1) {
-          // If the word is found in the dictionary, print a message indicating so
-          printf("The word '%s' is in the dictionary.\n", word);
-      } else {
-          // If the word is not found in the dictionary, print a message indicating so
-          printf("The word '%s' is not in the dictionary.\n", word);
-      }
-
-      printf("Stored words:\n");
-      for (int i = 0; i < word_count; i++) {
-          printf("%s\n", words[i]);
-          free(words[i]); // strdup으로 할당된 메모리 해제
-      }
+  const char *word = " "; // Declare a const char pointer to the word to be checked
 
   int n = 0; //line counts
-  read_lines(fd,print_line,&n);
+  read_lines(fd, print_line, &n, dict);
+
+  printf("Your Wrong word count is: %d \n", wrong_count);
   
   return EXIT_SUCCESS;; // Return 0 to indicate successful execution
    
