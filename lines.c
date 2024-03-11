@@ -11,10 +11,22 @@
 #define DEBUG 0
 #endif
 
-#ifndef BUFLENGTH
+#define MAX_WORDS 512
 #define BUFLENGTH 256
-#endif
 /*if BUFLENGTH is low(16,20,4)? or might certain line), printing last line cause error: idk the reason*/
+
+char *words[MAX_WORDS];
+int word_count = 0;
+
+
+void use_line(void *arg, char *line) {
+  if (word_count < MAX_WORDS) {
+    words[word_count++] = strdup(line);
+    if (DEBUG) printf("Stored: %s\n", line);
+  } else {
+    printf("Reached maximum word count. Cannot store more words.\n");
+  }
+}
 
 void read_lines(int fd, void(*use_line)(void *, char *), void *arg){
         //  filename  , variable for print_line        ,  n: line count
@@ -129,7 +141,7 @@ int main(int argc, char **argv){
     perror(fname);
     exit(EXIT_FAILURE);
   }
-
+/*
   off_t fileSize = lseek(fd, 0, SEEK_END);
   if (fileSize == -1) {
     perror("Error seeking file");
@@ -150,7 +162,7 @@ int main(int argc, char **argv){
   char word[*buffer];
   int n = 0; //line counts
   read_lines(fd,print_line,&n);
-
+*/
   // 
   const char *word = "example"; // Declare a const char pointer to the word to be checked
       const char *dictionary_file = "dictionary.txt"; // Declare a const char pointer to the dictionary file
@@ -163,7 +175,14 @@ int main(int argc, char **argv){
           printf("The word '%s' is not in the dictionary.\n", word);
       }
 
-      
+      printf("Stored words:\n");
+      for (int i = 0; i < word_count; i++) {
+          printf("%s\n", words[i]);
+          free(words[i]); // strdup으로 할당된 메모리 해제
+      }
+
+  int n = 0; //line counts
+  read_lines(fd,print_line,&n);
   
   return EXIT_SUCCESS;; // Return 0 to indicate successful execution
    
