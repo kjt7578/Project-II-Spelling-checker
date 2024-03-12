@@ -19,6 +19,24 @@ char *words[MAX_WORDS];
 int word_count = 0;
 int wrong_count = 0;
 
+char* strlwr(char* s) {
+    char* p = s;
+    while (*p) {
+        *p = tolower((unsigned char)*p);
+        p++;
+    }
+    return s;
+}
+
+char* strupr(char* s) {
+    char* p = s;
+    while (*p) {
+        *p = toupper((unsigned char)*p);
+        p++;
+    }
+    return s;
+}
+
 void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char *dict){
         //  filename  , variable for print_line        ,  n: line count
   int buflength = BUFLENGTH;
@@ -42,7 +60,7 @@ void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char
           buf[pos] = '\0';
 
         for(int i = pos; buf[i + 1] == ' '; i++) {
-            buf[i + 1] = '\0'; // 다음 공백을 널 문자로 대체
+            buf[i + 1] = '\0';
         }
 
         
@@ -111,6 +129,7 @@ int compare_each_word(const char *word, const char *dictionary_file) {
 
     return found;
 }
+  
 // ***************** COMPARE FUNCTION ENDS *********
 
 void use_line(void *arg, char *line) {
@@ -134,7 +153,7 @@ void print_line(void *st, char *line, char *dict){
     perror(dict);
     exit(EXIT_FAILURE);
   }
-  
+  /*
   //const char* dictionary_file = "words";
   if (compare_each_word(line, dict) == 1) {
       printf("The word '%s' is Correct.\n", line);
@@ -142,12 +161,51 @@ void print_line(void *st, char *line, char *dict){
       printf("The word '%s' is not in the dictionary.\n", line);
     wrong_count++;
   }
+*/
+  //******** CHECKING FOR CAPITALIZATION IN THE TEXT FILES ************* KELVIN'S PART
+  
+  if (compare_each_word(line, dict) == 0) { // Check if the word is not found in the dictionary
+      // Convert the word to lowercase
+      char lowercase_word[100];
+      strcpy(lowercase_word, line); // Copy the word to the lowercase_word array
+      strlwr(lowercase_word); // Convert the lowercase_word array to lowercase
 
+      // Check if the lowercase word is in the dictionary
+      if (compare_each_word(lowercase_word, dict) == 0) { // Check if the lowercase word is not found in the dictionary
+          // Check if the word with initial capitalization is in the dictionary
+          char initial_capital_word[100];
+          strncpy(initial_capital_word, line, 1); // Copy the first character of the word to the initial_capital_word array
+          strcpy(initial_capital_word + 1, lowercase_word + 1); // Copy the rest of the characters from the lowercase word to the initial_capital_word array
+          if (compare_each_word(initial_capital_word, dict) == 0) { // Check if the initial_capital_word is not found in the dictionary
+              // Check if the word in all capitals is in the dictionary
+              char all_caps_word[100];
+              strcpy(all_caps_word, line); // Copy the word to the all_caps_word array
+              strupr(all_caps_word); // Convert the all_caps_word array to all capitals
+              if (compare_each_word(all_caps_word, dict) == 0) { // Check if the all_caps_word is found in the dictionary
+                  // If all three variations are found in the dictionary, do nothing
+              } else {
+                  // If the word in all capitals is not found in the dictionary, print a message indicating so
+                  printf("The word '%s' is not in the dictionary.\n", line);
+              }
+          } else {
+              // If the word with initial capitalization is not found in the dictionary, print a message indicating so
+              printf("The word '%s' is not in the dictionary.\n", line);
+          }
+      } else {
+          // If the lowercase word is not found in the dictionary, do nothing
+      }
+  } else {
+      // If the word is found in the dictionary, print a message indicating so
+      printf("The word '%s' is in the dictionary.\n", line);
+  }
   
   
   if (DEBUG) printf("%d: %s\n", *p, line);
   (*p)++;  //pointing next line
 }
+// **************** CAP FOR TEXT FILES ENDS **************
+
+
 
 //*****************************************************************
 int main(int argc, char **argv){

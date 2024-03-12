@@ -8,6 +8,10 @@ ABC's
 ABCs
 ABM
 ABM's
+Hello
+hello
+HELLO
+HeLlO
 Hello, my name is JT.
 I am a student at Rutgers University.
 My major is computer science.
