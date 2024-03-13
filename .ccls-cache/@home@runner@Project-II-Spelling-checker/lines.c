@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -14,7 +15,7 @@
 #define MAX_WORDS 512
 #define BUFLENGTH 256
 /*if BUFLENGTH is low(16,20,4)? or might certain line), printing last line cause error: idk the reason*/
-
+const char *specialChars = ",\"()[]{}.?':/@*#$%^&._=";
 char *words[MAX_WORDS];
 int word_count = 0;
 int wrong_count = 0;
@@ -55,15 +56,13 @@ void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char
     
     while(pos < bufend){  // when line changed while buffer is not full
       if(DEBUG) printf("start %d, pos %d, char '%c'\n",line_start, pos, buf[pos]);
-      
-      if(buf[pos] == '\n' || buf[pos] == ' ' || buf[pos] == ',' || buf[pos] == '"' || buf[pos] == '(' || buf[pos] ==  ')'|| buf[pos] == '[' || buf[pos] == ']' || buf[pos] ==  '{' || buf[pos] == '}' || buf[pos] == '.' || buf[pos] == '?' || buf[pos] == ':' || buf[pos] == ';' || buf[pos] == '/' || buf[pos] == '@' || buf[pos] == '*' || buf[pos] == '#' || buf[pos] == '$' || buf[pos] == '%' || buf[pos] == '^' || buf[pos] == '&' || buf[pos] == '.' || buf[pos] == '.' || buf[pos] == '.' || buf[pos] == '_' || buf[pos] == '='){    // when found line change, space, punctuation
+
+      if (strchr(specialChars, buf[pos]) != NULL) {
           buf[pos] = '\0';
+      }
 
-        for(int i = pos; buf[i + 1] == ' '; i++) {
-            buf[i + 1] = '\0';
-        }
-
-        
+      if(buf[pos] == '\n' || buf[pos] == ' '){    // when found line change or space 
+        buf[pos] = '\0';      
         use_line(arg, buf + line_start, dict);           // print that line
         line_start = pos + 1;                      // set linestart as the beginning of the line
       }
@@ -153,62 +152,87 @@ void print_line(void *st, char *line, char *dict){
     perror(dict);
     exit(EXIT_FAILURE);
   }
-  /*
+  
+  
   //const char* dictionary_file = "words";
+  /*
   if (compare_each_word(line, dict) == 1) {
       printf("The word '%s' is Correct.\n", line);
   } else {
       printf("The word '%s' is not in the dictionary.\n", line);
     wrong_count++;
-  }
-*/
+  } 
+  */
+
   //******** CHECKING FOR CAPITALIZATION IN THE TEXT FILES ************* KELVIN'S PART
+
+  // Problem with the If Statement: Checking for words that are All-Uppercase and All-lowercase works, but checking Mixed-case letters like "heLLo" doesnt work. Needs to be fixed!
+  // Tip: Just store all the capital letter words in your data structure.
+
   
   if (compare_each_word(line, dict) == 0) { // Check if the word is not found in the dictionary
-      // Convert the word to lowercase
-      char lowercase_word[100];
-      strcpy(lowercase_word, line); // Copy the word to the lowercase_word array
-      strlwr(lowercase_word); // Convert the lowercase_word array to lowercase
+    // Convert the word to lowercase
+    char lowercase_word[100];
+    strcpy(lowercase_word, line); // Copy the word to the lowercase_word array
+    strlwr(lowercase_word); // Convert the lowercase_word array to lowercase
 
-      // Check if the lowercase word is in the dictionary
-      if (compare_each_word(lowercase_word, dict) == 0) { // Check if the lowercase word is not found in the dictionary
-          // Check if the word with initial capitalization is in the dictionary
-          char initial_capital_word[100];
-          strncpy(initial_capital_word, line, 1); // Copy the first character of the word to the initial_capital_word array
-          strcpy(initial_capital_word + 1, lowercase_word + 1); // Copy the rest of the characters from the lowercase word to the initial_capital_word array
-          if (compare_each_word(initial_capital_word, dict) == 0) { // Check if the initial_capital_word is not found in the dictionary
-              // Check if the word in all capitals is in the dictionary
-              char all_caps_word[100];
-              strcpy(all_caps_word, line); // Copy the word to the all_caps_word array
-              strupr(all_caps_word); // Convert the all_caps_word array to all capitals
-              if (compare_each_word(all_caps_word, dict) == 0) { // Check if the all_caps_word is found in the dictionary
-                  // If all three variations are found in the dictionary, do nothing
-              } else {
-                  // If the word in all capitals is not found in the dictionary, print a message indicating so
-                  printf("The word '%s' is not in the dictionary.\n", line);
-              }
-          } else {
-              // If the word with initial capitalization is not found in the dictionary, print a message indicating so
-              printf("The word '%s' is not in the dictionary.\n", line);
-          }
-      } else {
-          // If the lowercase word is not found in the dictionary, do nothing
-      }
+    // Check if the lowercase word is in the dictionary
+    if (compare_each_word(lowercase_word, dict) == 0) { // Check if the lowercase word is not found in the dictionary
+        // Check if the word with initial capitalization is in the dictionary
+        char initial_capital_word[100];
+        strncpy(initial_capital_word, line, 1); // Copy the first character of the word to the initial_capital_word array
+        strcpy(initial_capital_word + 1, lowercase_word + 1); // Copy the rest of the characters from the lowercase word to the initial_capital_word array
+        if (compare_each_word(initial_capital_word, dict) == 0) { // Check if the initial_capital_word is not found in the dictionary
+            // Check if the word in all capitals is in the dictionary
+            char all_caps_word[100];
+            strcpy(all_caps_word, line); // Copy the word to the all_caps_word array
+            strupr(all_caps_word); // Convert the all_caps_word array to all capitals
+            if (compare_each_word(all_caps_word, dict) == 0) { // Check if the all_caps_word is not found in the dictionary
+                // Check if the word has a single upper case letter followed by all lower case letters
+                if (isalpha(line[0]) && strlen(line) > 1 && strspn(line + 1, "abcdefghijklmnopqrstuvwxyz") == strlen(line) - 1) {
+                    // If the word is found in the dictionary, do nothing
+                } else {
+                    // If the word is not in the dictionary, increment the wrong word count
+                    wrong_count++;
+                    // Print a message indicating that the word is not in the dictionary
+                    printf("The word '%s' is not in the dictionary.\n", line);
+                }
+            }
+        } else {
+            // Check if the word with initial capitalization is found in the dictionary, do nothing
+        }
+    } else {
+        // Check if the lowercase word is found in the dictionary
+        if (compare_each_word(lowercase_word, dict) != 0) {
+            // Check if the word with initial capitalization is in the dictionary
+            char initial_capital_word[100];
+            strncpy(initial_capital_word, line, 1); // Copy the first character of the word to the initial_capital_word array
+            strcpy(initial_capital_word + 1, lowercase_word + 1); // Copy the rest of the characters from the lowercase word to the initial_capital_word array
+            if (compare_each_word(initial_capital_word, dict) == 0) {
+                // If the word with initial capitalization is found in the dictionary, do nothing
+            } else {
+                // If the word with initial capitalization is not found in the dictionary, increment the wrong word count
+                wrong_count++;
+                // Print a message indicating that the word is not in the dictionary
+                printf("The word '%s' is not in the dictionary.\n", line);
+            }
+        }
+    }
   } else {
-      // If the word is found in the dictionary, print a message indicating so
-      printf("The word '%s' is in the dictionary.\n", line);
+    // If the word is found in the dictionary, print a message indicating so
+    printf("The word '%s' is in the dictionary.\n", line);
   }
-  
-  
+
   if (DEBUG) printf("%d: %s\n", *p, line);
-  (*p)++;  //pointing next line
-}
+  (*p)++; // pointing next line
+  
+}  
 // **************** CAP FOR TEXT FILES ENDS **************
 
 
 
 //*****************************************************************
-int main(int argc, char **argv){
+ int main(int argc, char **argv) {
   char *dict = argc > 2 ? argv[1] : "words";
   // if we specified any dict file, open that file (argv[1]), if not, words
   int fd_dict = open(dict, O_RDONLY);
@@ -232,6 +256,6 @@ int main(int argc, char **argv){
 
   printf("Your Wrong word count is: %d \n", wrong_count);
   
-  return EXIT_SUCCESS;; // Return 0 to indicate successful execution
+  return EXIT_SUCCESS; // Return 0 to indicate successful execution
    
 }
