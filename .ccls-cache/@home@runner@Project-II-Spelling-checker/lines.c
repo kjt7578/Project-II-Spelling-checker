@@ -15,7 +15,7 @@
 #define MAX_WORDS 512
 #define BUFLENGTH 256
 /*if BUFLENGTH is low(16,20,4)? or might certain line), printing last line cause error: idk the reason*/
-const char *specialChars = ",\"()[]{}.?':/@*#$%^&._=";
+const char *specialChars = ",\"()[]{}.?':/@*#$%^&._=1234567890";
 char *words[MAX_WORDS];
 int word_count = 0;
 int wrong_count = 0;
@@ -53,16 +53,19 @@ void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char
     int bufend = pos + bytes;
 
     if (DEBUG) printf("Written bytes: %d\n", bytes);
-    
+
     while(pos < bufend){  // when line changed while buffer is not full
       if(DEBUG) printf("start %d, pos %d, char '%c'\n",line_start, pos, buf[pos]);
 
-      if (strchr(specialChars, buf[pos]) != NULL) {
+      if (pos == line_start && strchr("\"(['{", buf[pos]) != NULL) {
+          line_start++;
+      } else if (strchr(specialChars, buf[pos]) != NULL) {
           buf[pos] = '\0';
       }
 
-      if(buf[pos] == '\n' || buf[pos] == ' '){    // when found line change or space 
-        buf[pos] = '\0';      
+      if(buf[pos] == '\n' || buf[pos] == ' '){
+        buf[pos] = '\0'; 
+
         use_line(arg, buf + line_start, dict);           // print that line
         line_start = pos + 1;                      // set linestart as the beginning of the line
       }
@@ -141,6 +144,23 @@ void use_line(void *arg, char *line) {
 }
 
 //*****************************************************************
+int check_split_words(const char *word, const char *dictionary_file) {
+    char *copy_of_word = strdup(word);
+    char *token = strtok(copy_of_word, "-");
+    int result = 1;
+
+    while (token != NULL) {
+        if (compare_each_word(token, dictionary_file) == 0) {
+            result = 0;
+            break;
+        }
+        token = strtok(NULL, "-");
+    }
+
+    free(copy_of_word);
+    return result;
+}
+
 void print_line(void *st, char *line, char *dict){
   int *p = st;  //set pointer pointing n (line count)
 
@@ -152,18 +172,14 @@ void print_line(void *st, char *line, char *dict){
     perror(dict);
     exit(EXIT_FAILURE);
   }
-  
-  
-  //const char* dictionary_file = "words";
-  /*
-  if (compare_each_word(line, dict) == 1) {
-      printf("The word '%s' is Correct.\n", line);
+  if (strchr(line, '-') != NULL) {
+      if (check_split_words(line, dict) == 0) {
+          wrong_count++;
+          printf("The compound word '%s' is not in the dictionary.\n", line);
+      } else {
+          printf("The compound word '%s' is in the dictionary.\n", line);
+      }
   } else {
-      printf("The word '%s' is not in the dictionary.\n", line);
-    wrong_count++;
-  } 
-  */
-
   //******** CHECKING FOR CAPITALIZATION IN THE TEXT FILES ************* KELVIN'S PART
 
   // Problem with the If Statement: Checking for words that are All-Uppercase and All-lowercase works, but checking Mixed-case letters like "heLLo" doesnt work. Needs to be fixed!
@@ -222,6 +238,7 @@ void print_line(void *st, char *line, char *dict){
     // If the word is found in the dictionary, print a message indicating so
     printf("The word '%s' is in the dictionary.\n", line);
   }
+  }
 
   if (DEBUG) printf("%d: %s\n", *p, line);
   (*p)++; // pointing next line
@@ -232,30 +249,53 @@ void print_line(void *st, char *line, char *dict){
 
 
 //*****************************************************************
- int main(int argc, char **argv) {
-  char *dict = argc > 2 ? argv[1] : "words";
-  // if we specified any dict file, open that file (argv[1]), if not, words
-  int fd_dict = open(dict, O_RDONLY);
-  if(fd_dict < 0){
-    perror(dict);
-    exit(EXIT_FAILURE);
-  }
-  
-  char *fname = argc > 2 ? argv[2] : "test.txt";
-  // if we specified any txt file, open that file (argv[2]), if not, test.txt
-  int fd = open(fname, O_RDONLY);
-  if(fd < 0){
-    perror(fname);
-    exit(EXIT_FAILURE);
-  }
+void search_directory(char *dir_path, char *dict) {
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(dir_path);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+                continue;
+            }
 
-  const char *word = " "; // Declare a const char pointer to the word to be checked
+            char filepath[1024];
+            snprintf(filepath, sizeof(filepath), "%s/%s", dir_path, dir->d_name);
 
-  int n = 0; //line counts
-  read_lines(fd, print_line, &n, dict);
+            struct stat path_stat;
+            stat(filepath, &path_stat);
 
-  printf("Your Wrong word count is: %d \n", wrong_count);
-  
-  return EXIT_SUCCESS; // Return 0 to indicate successful execution
-   
+            if (S_ISDIR(path_stat.st_mode)) {
+                search_directory(filepath, dict);
+            } else if (strstr(dir->d_name, ".txt") != NULL) {
+                printf("Opening file: %s\n", filepath);
+
+                int fd = open(filepath, O_RDONLY);
+                if(fd < 0) {
+                    perror(filepath);
+                    continue;
+                }
+
+                int n = 0;
+                wrong_count = 0;
+                read_lines(fd, print_line, &n, dict);
+                printf("Your Wrong word count is: %d \n\n", wrong_count);
+
+
+                close(fd);
+            }
+        }
+        closedir(d);
+    } else {
+        perror("Directory open error");
+    }
+}
+
+int main(int argc, char **argv) {
+    char *dict_dir = argc > 1 ? argv[1] : ".";
+    char *dict = "words";
+
+    search_directory(dict_dir, dict);
+
+    return EXIT_SUCCESS;
 }
