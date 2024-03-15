@@ -1,7 +1,11 @@
-$100
-$doller sign
+100
+hell
+123412
+$money
+sign
 "Kelvin"
 (you)
+((me))
 I do coding.
 hello
 Hello
@@ -12,3 +16,5 @@ apple-juice
 hello
 apple-jcie
 foo-bar
+#"$wo12rd""
+wo1"\"2rd

@@ -38,64 +38,58 @@ char* strupr(char* s) {
     return s;
 }
 
-void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char *dict){
-        //  filename  , variable for print_line        ,  n: line count
-  int buflength = BUFLENGTH;
-  char *buf = malloc(BUFLENGTH);
+void read_lines(int fd, void(*use_line)(void *, char *, char *), void *arg, char *dict) {
+    int buflength = BUFLENGTH;
+    char *buf = malloc(BUFLENGTH);
+    char *original_buf = malloc(BUFLENGTH);
 
-  int pos = 0;    // position of arr
-  int bytes;      // bytes that written
-  int line_start; // location of line starts
+    int pos = 0;
+    int bytes;
+    int line_start = 0;
 
-  while((bytes = read(fd, buf + pos, buflength - pos)) > 0){  // read return num of written bytes
-    if(DEBUG) printf("read %d bytes; pos = %d\n", bytes, pos);
-    line_start = 0;
-    int bufend = pos + bytes;
+  while ((bytes = read(fd, buf + pos, BUFLENGTH - pos)) > 0) {
+  if (DEBUG) printf("read %d bytes; pos = %d\n", bytes, pos);
+  memcpy(original_buf, buf, BUFLENGTH);
+  int bufend = pos + bytes;
 
-    if (DEBUG) printf("Written bytes: %d\n", bytes);
-
-    while(pos < bufend){  // when line changed while buffer is not full
-      if(DEBUG) printf("start %d, pos %d, char '%c'\n",line_start, pos, buf[pos]);
-
-      if (pos == line_start && strchr("\"(['{", buf[pos]) != NULL) {
-          line_start++;
-      } else if (strchr(specialChars, buf[pos]) != NULL) {
-          buf[pos] = '\0';
-      }
-
-      if(buf[pos] == '\n' || buf[pos] == ' '){
-        buf[pos] = '\0'; 
-
-        use_line(arg, buf + line_start, dict);           // print that line
-        line_start = pos + 1;                      // set linestart as the beginning of the line
+  while (pos < bufend) {
+      if (buf[pos] == '\n' || buf[pos] == ' ') {
+          char *line_start_ptr = original_buf + line_start;
+          int line_length = pos - line_start;
+          original_buf[pos] = '\0';
+          use_line(arg, line_start_ptr, dict);
+          line_start = pos + 1;
       }
       pos++;
-    }
-
-    if (line_start == pos){  // no partial line
-      pos = 0;
-    }
-    else if (line_start > 0){ // partial line. fill the buffer with partial words
-      int segment_length = pos - line_start;
-      memmove(buf, buf + line_start, segment_length); 
-      // move memory (length of segment_length) which is starting buf + line_start to buf
-      pos = segment_length;
-      if (DEBUG) printf("move %d bytes to buffer start\n", segment_length);
-    }
-    else if(bufend == buflength){    // when partial line fills buffer
-      buflength *= 2;              
-      buf = realloc(buf, buflength); // increase buffer size
-      if (DEBUG) printf("increase buffer to %d bytes\n", buflength);
-    }
-  } // 25 while end
-  if (pos > 0){          //when the last line is after eof?
-    if(pos == buflength){
-      buf = realloc(buf, buflength + 1);
-    }
-    buf[pos] = '\0';
-    use_line(arg, buf + line_start, dict);
   }
-  free(buf);
+
+        if (line_start == pos){
+            pos = 0;
+        }
+        else if (line_start > 0){
+            int segment_length = pos - line_start;
+            memmove(buf, buf + line_start, segment_length); 
+            memmove(original_buf, original_buf + line_start, segment_length);
+            pos = segment_length;
+            if (DEBUG) printf("move %d bytes to buffer start\n", segment_length);
+        }
+        else if(bufend == buflength){
+            buflength *= 2;              
+            buf = realloc(buf, buflength);
+            original_buf = realloc(original_buf, buflength);
+            if (DEBUG) printf("increase buffer to %d bytes\n", buflength);
+        }
+    }
+    if (pos > 0){
+        if(pos == buflength){
+            buf = realloc(buf, buflength + 1);
+            original_buf = realloc(original_buf, buflength + 1);
+        }
+        original_buf[pos] = '\0';
+        use_line(arg, original_buf + line_start, dict);
+    }
+    free(buf);
+    free(original_buf);
 }
 
 // ************* KELVIN'S PART ***************
@@ -161,6 +155,27 @@ int check_split_words(const char *word, const char *dictionary_file) {
     return result;
 }
 
+void strip_special_chars(char* word) {
+    char* start = word;
+    char* end;
+
+    while (*start && !isalpha((unsigned char)*start)) {
+        start++;
+    }
+    if (*start == 0) {
+        *word = '\0';
+        return;
+    }
+
+    end = start + strlen(start) - 1;
+    while (end > start && !isalpha((unsigned char)*end)) {
+        end--;
+    }
+
+    memmove(word, start, end - start + 1);
+    word[end - start + 1] = '\0';
+}
+
 void print_line(void *st, char *line, char *dict){
   int *p = st;  //set pointer pointing n (line count)
 
@@ -172,12 +187,17 @@ void print_line(void *st, char *line, char *dict){
     perror(dict);
     exit(EXIT_FAILURE);
   }
+  
+  char original_line[100];
+  strcpy(original_line, line);
+  strip_special_chars(line);
+  
   if (strchr(line, '-') != NULL) {
       if (check_split_words(line, dict) == 0) {
           wrong_count++;
-          printf("The compound word '%s' is not in the dictionary.\n", line);
+          printf("The compound word '%s' is not in the dictionary.\n", original_line);
       } else {
-          printf("The compound word '%s' is in the dictionary.\n", line);
+          printf("The compound word '%s' is in the dictionary.\n", original_line);
       }
   } else {
   //******** CHECKING FOR CAPITALIZATION IN THE TEXT FILES ************* KELVIN'S PART
@@ -211,7 +231,7 @@ void print_line(void *st, char *line, char *dict){
                     // If the word is not in the dictionary, increment the wrong word count
                     wrong_count++;
                     // Print a message indicating that the word is not in the dictionary
-                    printf("The word '%s' is not in the dictionary.\n", line);
+                    printf("The word '%s' is not in the dictionary.\n", original_line);
                 }
             }
         } else {
@@ -230,17 +250,17 @@ void print_line(void *st, char *line, char *dict){
                 // If the word with initial capitalization is not found in the dictionary, increment the wrong word count
                 wrong_count++;
                 // Print a message indicating that the word is not in the dictionary
-                printf("The word '%s' is not in the dictionary.\n", line);
+                printf("The word '%s' is not in the dictionary.\n", original_line);
             }
         }
     }
   } else {
     // If the word is found in the dictionary, print a message indicating so
-    printf("The word '%s' is in the dictionary.\n", line);
+    printf("The word '%s' is in the dictionary.\n", original_line);
   }
   }
 
-  if (DEBUG) printf("%d: %s\n", *p, line);
+  if (DEBUG) printf("%d: %s\n", *p, original_line);
   (*p)++; // pointing next line
   
 }  
