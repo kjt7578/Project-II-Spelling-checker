@@ -1,4 +1,31 @@
-Hello, my name is JT.
-I am a student at Rutgers University.
-My major is computer science.
-JT jT JT JT JT
+CORRECT WORDS
+correct words
+apple
+banana
+peach
+orange coconut kiwi
+We sell cherry and lemon.
+straw-berry, black-berry and raspberry.
+plum
+Plum
+PLUM
+pLum
+plUm
+pluM
+Grape is $100 dollars.
+"Pineapple" is out of stock.
+Worng WORDS
+appple
+baneana
+pearckl
+oraniege cococounut klwls
+We sell cherrrrry and lemoun.
+straw-berry, black-berry and raspberry.
+plum
+Plum
+PLUM
+pLum
+plUm
+pluM
+Grape is $100 dollars.
+"Pineapple" is out of stock.

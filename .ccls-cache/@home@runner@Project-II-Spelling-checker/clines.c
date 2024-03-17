@@ -12,11 +12,15 @@
 #define DEBUG 0
 #endif
 
-#define MAX_WORDS 512
-#define BUFLENGTH 256
+#define MAX_WORDS 2000
+#define BUFLENGTH 2000
 char *words[MAX_WORDS];
 int word_count = 0;
 int wrong_count = 0;
+int row_ct = 1;
+int col_ct = 1;
+int check = 0;
+
 
 char* strlwr(char* s) {
     char* p = s;
@@ -50,8 +54,19 @@ void read_lines(int fd, void(*use_line)(void *, char *, char *, char *), void *a
   memcpy(original_buf, buf, BUFLENGTH);
   int bufend = pos + bytes;
 
+
   while (pos < bufend) {
-      if (buf[pos] == '\n' || buf[pos] == ' ') {
+    if (check == 1){
+      col_ct = 1;
+      row_ct++;
+      check = 0;
+    }
+
+    if (buf[pos] == 10) {
+        check = 1;
+    }
+
+      if (buf[pos] == 10 || buf[pos] == 32) {
           char *line_start_ptr = original_buf + line_start;
           int line_length = pos - line_start;
           original_buf[pos] = '\0';
@@ -155,16 +170,15 @@ void strip_special_chars(char* word) {
         *word = '\0';
         return;
     }
-  
+
     end = start + strlen(start) - 1;
     while (end > start && !isalpha((unsigned char)*end)) {
         end--;
     }
-  
+
     memmove(word, start, end - start + 1);
     word[end - start + 1] = '\0';
 }
-
 
 
 void print_line(void *st, char *line, char *dict, char *filepath) {
@@ -173,6 +187,8 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
 
     int fd_dict = open(dict, O_RDONLY);
     if (fd_dict < 0) {
+        printf("File open error");
+        wrong_count++;
         perror(dict);
         exit(EXIT_FAILURE);
     }
@@ -180,6 +196,7 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
     char original_line[100];
     strcpy(original_line, line);
     strip_special_chars(line);
+
 
     int column_number = 0;
     char *ptr = line;
@@ -191,7 +208,8 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
     if (strchr(line, '-') != NULL) {
         if (check_split_words(line, dict) == 0) {
             wrong_count++;
-            printf("%s (%d,%d): %s\n", filepath, line_number + 1, column_number + 1, original_line);
+          printf("%s (%d,%d): %s\n", filepath, row_ct, col_ct, original_line);
+          col_ct++;
         }
     } else {
         if (compare_each_word(line, dict) == 0) {
@@ -211,7 +229,8 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
                         if (isalpha(line[0]) && strlen(line) > 1 && strspn(line + 1, "abcdefghijklmnopqrstuvwxyz") == strlen(line) - 1) {
                         } else {
                             wrong_count++;
-                            printf("%s (%d,%d): %s\n", filepath, line_number + 1, column_number + 1, original_line);
+                          printf("%s (%d,%d): %s\n", filepath, row_ct, col_ct, original_line);
+                          col_ct++;
                         }
                     }
                 }
@@ -223,11 +242,16 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
                     if (compare_each_word(initial_capital_word, dict) == 0) {
                     } else {
                         wrong_count++;
-                        printf("%s (%d,%d): %s\n", filepath, line_number + 1, column_number + 1, original_line);
+                      printf("%s (%d,%d): %s\n", filepath, row_ct, col_ct, original_line);
+                      col_ct++;
                     }
                 }
             }
         }
+      else {
+        //printf("%s (%d,%d): %s : CORRECT\n", filepath, row_ct, col_ct, original_line);
+        col_ct++;
+      }
     }
     if (DEBUG) printf("%d: %s\n", *p, line);
     (*p)++;
@@ -239,6 +263,7 @@ void search_directory(char *dir_path, char *dict) {
     DIR *d;
     struct dirent *dir;
     d = opendir(dir_path);
+
     if (d) {
         while ((dir = readdir(d)) != NULL) {
             if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
@@ -254,35 +279,57 @@ void search_directory(char *dir_path, char *dict) {
             if (S_ISDIR(path_stat.st_mode)) {
                 search_directory(filepath, dict);
             } else if (strstr(dir->d_name, ".txt") != NULL) {
-                printf("Opening file: %s\n", filepath);
+                row_ct = 1;
+                col_ct = 1;
+                //printf("Opening file: %s\n", filepath);
 
                 int fd = open(filepath, O_RDONLY);
                 if(fd < 0) {
                     perror(filepath);
+                    printf("File open error");
+                    wrong_count++;
                     continue;
                 }
 
                 int n = 0;
-                wrong_count = 0;
+                //wrong_count = 0;
                 read_lines(fd, print_line, &n, dict, filepath);
-                printf("Your Wrong word count is: %d \n\n", wrong_count);
-
-
+                //printf("Your Wrong word count is: %d \n\n", wrong_count);
                 close(fd);
             }
         }
         closedir(d);
     } else {
-        perror("Directory open error");
+        printf("Directory open error");
+        wrong_count++;
     }
+
 }
 
 
 int main(int argc, char **argv) {
-    char *txt_dir = argc > 1 ? argv[1] : ".";
-    char *dict = "my_dict";
+    char *dict = "words";
+    int file_start_index = 2;
 
-    search_directory(txt_dir, dict);
+    if (argc < 2) {
+        printf("Usage: %s dictionary [file or directory...]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
 
-    return EXIT_SUCCESS;
+    dict = argv[1];
+
+    if (argc < 3) {
+        char *txt_dir = ".";
+        search_directory(txt_dir, dict);
+    } else {
+        for (int i = file_start_index; i < argc; i++) {
+            search_directory(argv[i], dict);
+        }
+    }
+
+    if (wrong_count == 0) {
+        return EXIT_SUCCESS;
+    } else {
+        return EXIT_FAILURE;
+    }
 }
