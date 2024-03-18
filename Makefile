@@ -1,16 +1,12 @@
-all: main
+CC	=	gcc
+CFLAGS	=	-Wall
+all:	spchk
 
-CC = clang
-override CFLAGS += -g -Wno-everything -pthread -lm
+spchk:	spchk.o
+	$(CC)	$(CFLAGS)	-o	spchk	spchk.o
 
-SRCS = $(shell find . -name '.ccls-cache' -type d -prune -o -type f -name '*.c' -print)
-HEADERS = $(shell find . -name '.ccls-cache' -type d -prune -o -type f -name '*.h' -print)
-
-main: $(SRCS) $(HEADERS)
-	$(CC) $(CFLAGS) $(SRCS) -o "$@"
-
-main-debug: $(SRCS) $(HEADERS)
-	$(CC) $(CFLAGS) -O0 $(SRCS) -o "$@"
+spchk.o:	spchk.c
+	$(CC)	$(CFLAGS)	-c	spchk.c
 
 clean:
-	rm -f main main-debug
+	rm	-f	spchk	spchk.o
