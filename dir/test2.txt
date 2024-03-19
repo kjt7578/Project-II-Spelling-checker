@@ -10,7 +10,6 @@ hello
 Hello
 HELLO
 hEllO
-JT Kim
 apple-juice
 hello
 apple-jcie

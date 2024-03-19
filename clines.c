@@ -43,58 +43,60 @@ char* strupr(char* s) {
 void read_lines(int fd, void(*use_line)(void *, char *, char *, char *), void *arg, char *dict, char *filepath) {
     int buflength = BUFLENGTH;
     char *buf = malloc(BUFLENGTH);
-    char *original_buf = malloc(BUFLENGTH);
+    char *original_buf = malloc(BUFLENGTH); // original_buf의 크기 수정
 
     int pos = 0;
     int bytes;
     int line_start = 0;
 
-  while ((bytes = read(fd, buf + pos, BUFLENGTH - pos)) > 0) {
-  if (DEBUG) printf("read %d bytes; pos = %d\n", bytes, pos);
-  memcpy(original_buf, buf, BUFLENGTH);
-  int bufend = pos + bytes;
+    while ((bytes = read(fd, buf + pos, BUFLENGTH - pos)) > 0) {
+        if (DEBUG) printf("read %d bytes; pos = %d\n", bytes, pos);
+        // memcpy(original_buf, buf, BUFLENGTH); // 이 부분은 불필요
+        memcpy(original_buf, buf, bytes); // 수정된 부분: 실제로 읽은 바이트 수만큼 복사
 
-  while (pos < bufend) {
-    if (check == 1){
-      col_ct = 1;
-      check = 0;
-    }
-    
-      if (buf[pos] == '\n' || buf[pos] == ' ') {
-        if(buf[pos] == '\n'){
-          row_ct++;
-          check = 1;
+        int bufend = pos + bytes;
+
+        while (pos < bufend) {
+            if (check == 1) {
+                col_ct = 1;
+                check = 0;
+            }
+
+            if (buf[pos] == '\n' || buf[pos] == ' ') {
+                if (buf[pos] == '\n') {
+                    row_ct++;
+                    check = 1;
+                }
+                char *line_start_ptr = original_buf + line_start;
+                int line_length = pos - line_start;
+                original_buf[pos] = '\0';
+                use_line(arg, line_start_ptr, dict, filepath);
+                line_start = pos + 1;
+            }
+            pos++;
         }
-          char *line_start_ptr = original_buf + line_start;
-          int line_length = pos - line_start;
-          original_buf[pos] = '\0';
-          use_line(arg, line_start_ptr, dict, filepath);
-          line_start = pos + 1;
-      }
-      pos++;
-  }
 
-        if (line_start == pos){
+        if (line_start == pos) {
             pos = 0;
         }
-        else if (line_start > 0){
+        else if (line_start > 0) {
             int segment_length = pos - line_start;
-            memmove(buf, buf + line_start, segment_length); 
+            memmove(buf, buf + line_start, segment_length);
             memmove(original_buf, original_buf + line_start, segment_length);
             pos = segment_length;
             if (DEBUG) printf("move %d bytes to buffer start\n", segment_length);
         }
-        else if(bufend == buflength){
-            buflength *= 2;              
+        else if (bufend == buflength) {
+            buflength *= 2;
             buf = realloc(buf, buflength);
-            original_buf = realloc(original_buf, buflength);
+            original_buf = realloc(original_buf, buflength); // original_buf의 크기를 조정
             if (DEBUG) printf("increase buffer to %d bytes\n", buflength);
         }
     }
-    if (pos > 0){
-        if(pos == buflength){
+    if (pos > 0) {
+        if (pos == buflength) {
             buf = realloc(buf, buflength + 1);
-            original_buf = realloc(original_buf, buflength + 1);
+            original_buf = realloc(original_buf, buflength + 1); // original_buf의 크기를 조정
         }
         original_buf[pos] = '\0';
         use_line(arg, original_buf + line_start, dict, filepath);
@@ -102,6 +104,7 @@ void read_lines(int fd, void(*use_line)(void *, char *, char *, char *), void *a
     free(buf);
     free(original_buf);
 }
+
 
 int compare_each_word(const char *word, const char *dictionary_file) {
     FILE *file;
@@ -200,7 +203,7 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
         column_number++;
         ptr++;
     }
-
+  
     if (strchr(line, '-') != NULL) {
         if (check_split_words(line, dict) == 0) {
             wrong_count++;
@@ -253,6 +256,52 @@ void print_line(void *st, char *line, char *dict, char *filepath) {
     (*p)++;
 }
 
+// CHECK FOR CAPITALIZATION (Kelvin's Part)
+
+int check_capitalization(const char *word, const char *dictionary_file) {
+    
+    // Check if the word is in the dictionary
+    if (compare_each_word(word, dictionary_file) == 1) {
+        return 1;
+    }
+
+    // Check if the word with initial capitalization is in the dictionary
+    char initial_capital_word[100];
+    strncpy(initial_capital_word, word, 1);
+    strcpy(initial_capital_word + 1, word + 1);
+    initial_capital_word[0] = toupper(initial_capital_word[0]);
+    if (compare_each_word(initial_capital_word, dictionary_file) == 1) {
+        return 1;
+    }
+
+    // Check if the word in all capitals is in the dictionary
+    char all_caps_word[100];
+    strcpy(all_caps_word, word);
+    strupr(all_caps_word);
+    if (compare_each_word(all_caps_word, dictionary_file) == 1) {
+        return 1;
+    }
+
+    // Check if the word has an upper case letter from the second letter of the word to the end
+    int has_upper = 0;
+    int len = strlen(word);
+    for (int i = 1; i < len; i++) {
+        if (isupper(word[i])) {
+            has_upper = 1;
+            break;
+        }
+    }
+
+    if (has_upper) {
+        wrong_count++;
+        printf("'%s' is not capitalized correctly \n", word);
+    }
+
+    return 0;
+
+  if (DEBUG) printf("%d: %s\n", *p, word);
+  (*p)++;
+}
 
 
 void search_directory(char *dir_path, char *dict) {
@@ -298,10 +347,32 @@ void search_directory(char *dir_path, char *dict) {
     }
 }
 
+/*
+// Function to check if a word is correctly spelled
+int isCorrectlySpelled(char* word, char* dictionary) {
+    // Convert both word and dictionary to lowercase for case-insensitive comparison
+    char lowercase_word[MAX_WORD_LENGTH], lowercase_dictionary[MAX_WORD_LENGTH];
+    strcpy(lowercase_word, word);
+    strcpy(lowercase_dictionary, dictionary);
+    for (int i = 0; lowercase_word[i]; i++) {
+        lowercase_word[i] = tolower(lowercase_word[i]);
+    }
+    for (int i = 0; lowercase_dictionary[i]; i++) {
+        lowercase_dictionary[i] = tolower(lowercase_dictionary[i]);
+    }
+    if (strcmp(word, dictionary) == 0 || strcmp(lowercase_word, lowercase_dictionary) == 0) {
+        return 1; // Word is correctly spelled
+    }
+    return 0; // Word is misspelled
+}
+*/
+
+
+
 
 int main(int argc, char **argv) {
     char *txt_dir = argc > 1 ? argv[1] : ".";
-    char *dict = "words";
+    char *dict = "fruit";
 
     search_directory(txt_dir, dict);
 
