@@ -4,6 +4,8 @@ PLUM
 pLum
 plUm
 pluM
+-
+\
 apple
 Apple
 CORRECT WORDS
